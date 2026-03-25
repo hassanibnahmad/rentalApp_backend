@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: rentalApp_backend
+    env: java
+    buildCommand: ./mvnw clean package
+    startCommand: java -jar target/*.jar
+    branch: main
+    plan: free
