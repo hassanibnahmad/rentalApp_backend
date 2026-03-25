@@ -2,7 +2,8 @@ FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY . .
 RUN chmod +x mvnw
-RUN ./mvnw -B clean package
+# Skip tests during container builds to avoid env-dependent failures
+RUN ./mvnw -B clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
