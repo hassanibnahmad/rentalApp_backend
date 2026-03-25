@@ -1,8 +1,7 @@
 services:
   - type: web
     name: rentalApp_backend
-    env: java
-    buildCommand: ./mvnw clean package
-    startCommand: java -jar target/*.jar
+    env: docker
+    dockerfilePath: Dockerfile
     branch: main
     plan: free

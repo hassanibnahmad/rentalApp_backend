@@ -4,7 +4,6 @@ import com.julia_auto_cars.rental_api.dto.ReservationExtraRequest;
 import com.julia_auto_cars.rental_api.dto.ReservationRequest;
 import com.julia_auto_cars.rental_api.dto.ReservationResponse;
 import com.julia_auto_cars.rental_api.model.*;
-import com.julia_auto_cars.rental_api.repository.CarRepository;
 import com.julia_auto_cars.rental_api.repository.CustomerRepository;
 import com.julia_auto_cars.rental_api.repository.ReservationRepository;
 import com.julia_auto_cars.rental_api.service.ReservationService;
@@ -23,20 +22,12 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final CustomerRepository customerRepository;
-    private final CarRepository carRepository;
 
     // This method is used to create a new reservation. It validates the input data, checks for availability, saves the customer if necessary, creates the reservation, attaches any extras, computes the totals, and saves the reservation to the repository. Finally, it maps the saved reservation to a response DTO and returns it.
     @Override
     public ReservationResponse createReservation(ReservationRequest request) {
         validateDates(request);
         ensureAvailability(request);
-
-        Car car = carRepository.findById(request.carId())
-            .orElseThrow(() -> new IllegalArgumentException("Véhicule introuvable"));
-        Integer pricePerDay = car.getPricePerDay();
-        if (pricePerDay == null) {
-            throw new IllegalStateException("Tarif journalier non défini pour ce véhicule");
-        }
 
         Customer customer = customerRepository
                 .findByEmail(request.email())
@@ -50,7 +41,7 @@ public class ReservationServiceImpl implements ReservationService {
                 .returnCity(request.returnCity())
                 .returnDate(request.returnDate())
                 .status(ReservationStatus.PENDING_PAYMENT)
-            .dailyRate(BigDecimal.valueOf(pricePerDay))
+                .dailyRate(BigDecimal.ZERO)
                 .daysCount(daysBetween(request))
                 .totalAmount(BigDecimal.ZERO)
                 .notes(request.notes())
