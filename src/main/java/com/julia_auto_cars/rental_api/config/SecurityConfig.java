@@ -30,12 +30,12 @@ public class    SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers("/api/auth/change-email", "/api/auth/change-password").hasAuthority("ADMIN")
                     .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/auth/change-email", "/api/auth/change-password").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
-                        .requestMatchers("/api/cars/**", "/api/availability").permitAll()
-                        .requestMatchers("/api/reservations/**").hasAnyAuthority("ADMIN", "CLIENT")
-                        .anyRequest().authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
+                    .requestMatchers("/api/cars/**", "/api/availability").permitAll()
+                    .requestMatchers("/api/reservations/**").hasAnyAuthority("ADMIN", "CLIENT")
+                    .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
