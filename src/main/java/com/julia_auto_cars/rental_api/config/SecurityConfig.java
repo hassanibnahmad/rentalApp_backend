@@ -16,7 +16,7 @@ import com.julia_auto_cars.rental_api.security.JwtAuthenticationFilter;
 
 @Configuration
 @EnableMethodSecurity
-public class SecurityConfig {
+public class    SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
