@@ -23,6 +23,18 @@ public class Car {
     @Column(name = "daily_price")
     private Integer pricePerDay;
 
+    private Integer year;
+    private Integer mileage;
+    private String color;
+    private Integer doors;
+    private String engine;
+
+    @Column(name = "license_plate")
+    private String licensePlate;
+
+    @Column(length = 120)
+    private String location;
+
     private String transmission;
     private String fuel;
     private Integer seats;
@@ -116,6 +128,62 @@ public class Car {
 
     public void setPricePerDay(Integer pricePerDay) {
         this.pricePerDay = pricePerDay;
+    }
+
+    public Integer getYear() {
+        return year;
+    }
+
+    public void setYear(Integer year) {
+        this.year = year;
+    }
+
+    public Integer getMileage() {
+        return mileage;
+    }
+
+    public void setMileage(Integer mileage) {
+        this.mileage = mileage;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
+    }
+
+    public Integer getDoors() {
+        return doors;
+    }
+
+    public void setDoors(Integer doors) {
+        this.doors = doors;
+    }
+
+    public String getEngine() {
+        return engine;
+    }
+
+    public void setEngine(String engine) {
+        this.engine = engine;
+    }
+
+    public String getLicensePlate() {
+        return licensePlate;
+    }
+
+    public void setLicensePlate(String licensePlate) {
+        this.licensePlate = licensePlate;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public String getTransmission() {
