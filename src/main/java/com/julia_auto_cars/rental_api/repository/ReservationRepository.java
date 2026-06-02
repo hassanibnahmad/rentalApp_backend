@@ -20,5 +20,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                                       @Param("startDate") LocalDate startDate,
                                       @Param("endDate") LocalDate endDate,
                                       @Param("statuses") List<ReservationStatus> statuses);
+
+    @Query("SELECT r FROM Reservation r WHERE r.carId = :carId " +
+            "AND r.id <> :reservationId " +
+            "AND r.status IN :statuses " +
+            "AND r.pickupDate < :endDate " +
+            "AND r.returnDate > :startDate")
+    List<Reservation> findOverlappingExcludingId(@Param("reservationId") Long reservationId,
+                                                 @Param("carId") Long carId,
+                                                 @Param("startDate") LocalDate startDate,
+                                                 @Param("endDate") LocalDate endDate,
+                                                 @Param("statuses") List<ReservationStatus> statuses);
 }
 

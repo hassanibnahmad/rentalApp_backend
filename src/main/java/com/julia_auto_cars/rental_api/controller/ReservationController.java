@@ -23,6 +23,11 @@ public class ReservationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(reservationService.createReservation(request));
     }
 
+    @PutMapping("/{id}")
+    public ReservationResponse update(@PathVariable Long id, @RequestBody ReservationRequest request) {
+        return reservationService.updateReservation(id, request);
+    }
+
     @PostMapping("/{id}/confirm")
     public ReservationResponse confirm(@PathVariable Long id) {
         return reservationService.confirmReservation(id);

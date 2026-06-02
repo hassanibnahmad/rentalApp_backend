@@ -16,6 +16,7 @@ public record ReservationResponse(
         String customerLastName,
         String customerEmail,
         String customerPhone,
+        String documentId,
         String pickupCity,
         LocalDate pickupDate,
         String returnCity,

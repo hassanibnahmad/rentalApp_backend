@@ -38,9 +38,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new IllegalStateException("Le tarif journalier du véhicule est invalide");
         }
 
-        Customer customer = customerRepository
-                .findByEmail(request.email())
-                .orElseGet(() -> saveCustomer(request));
+        Customer customer = upsertCustomer(request);
 
         Reservation reservation = Reservation.builder()
                 .carId(request.carId())
@@ -61,6 +59,39 @@ public class ReservationServiceImpl implements ReservationService {
 
         Reservation saved = reservationRepository.save(reservation);
         return mapToResponse(saved);
+    }
+
+    @Override
+    public ReservationResponse updateReservation(Long reservationId, ReservationRequest request) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reservation introuvable"));
+
+        validateDates(request);
+        ensureAvailabilityForUpdate(reservationId, request);
+
+        Car car = carRepository.findById(request.carId())
+                .orElseThrow(() -> new IllegalArgumentException("Véhicule introuvable"));
+
+        Integer pricePerDay = car.getPricePerDay();
+        if (pricePerDay == null || pricePerDay <= 0) {
+            throw new IllegalStateException("Le tarif journalier du véhicule est invalide");
+        }
+
+        Customer customer = upsertCustomer(request);
+        reservation.getExtras().clear();
+
+        reservation.setCarId(request.carId());
+        reservation.setCustomer(customer);
+        reservation.setPickupCity(request.pickupCity());
+        reservation.setPickupDate(request.pickupDate());
+        reservation.setReturnCity(request.returnCity());
+        reservation.setReturnDate(request.returnDate());
+        reservation.setDailyRate(BigDecimal.valueOf(pricePerDay));
+        reservation.setNotes(request.notes());
+
+        attachExtras(reservation, request.extras());
+        computeTotals(reservation);
+        return mapToResponse(reservationRepository.save(reservation));
     }
 
     // This method is used to confirm a reservation. It retrieves the reservation by its ID, checks if it is already confirmed, and if not, updates its status to CONFIRMED. Finally, it maps the updated reservation to a response DTO and returns it.
@@ -136,14 +167,28 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    private Customer saveCustomer(ReservationRequest request) {
-        Customer customer = Customer.builder()
-                .firstName(request.firstName())
-                .lastName(request.lastName())
-                .email(request.email())
-                .phone(request.phone())
-                .documentId(request.documentId())
-                .build();
+    private void ensureAvailabilityForUpdate(Long reservationId, ReservationRequest request) {
+        List<Reservation> overlaps = reservationRepository.findOverlappingExcludingId(
+                reservationId,
+                request.carId(),
+                request.pickupDate(),
+                request.returnDate(),
+                List.of(ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED)
+        );
+        if (!overlaps.isEmpty()) {
+            throw new IllegalStateException("Le véhicule est déjà réservé sur cette période");
+        }
+    }
+
+    private Customer upsertCustomer(ReservationRequest request) {
+        Customer customer = customerRepository
+                .findByEmail(request.email())
+                .orElseGet(Customer::new);
+        customer.setFirstName(request.firstName());
+        customer.setLastName(request.lastName());
+        customer.setEmail(request.email());
+        customer.setPhone(request.phone());
+        customer.setDocumentId(request.documentId());
         return customerRepository.save(customer);
     }
 
@@ -191,6 +236,7 @@ public class ReservationServiceImpl implements ReservationService {
                 reservation.getCustomer().getLastName(),
                 reservation.getCustomer().getEmail(),
                 reservation.getCustomer().getPhone(),
+                reservation.getCustomer().getDocumentId(),
                 reservation.getPickupCity(),
                 reservation.getPickupDate(),
                 reservation.getReturnCity(),
