@@ -1,5 +1,10 @@
 package com.julia_auto_cars.rental_api.service.impl;
 
+import com.julia_auto_cars.rental_api.automation.model.AutomationEventType;
+import com.julia_auto_cars.rental_api.automation.model.JobStatus;
+import com.julia_auto_cars.rental_api.automation.repository.AutomationEventRepository;
+import com.julia_auto_cars.rental_api.automation.repository.AutomationJobRepository;
+import com.julia_auto_cars.rental_api.automation.service.AutomationEngine;
 import com.julia_auto_cars.rental_api.dto.ReservationExtraRequest;
 import com.julia_auto_cars.rental_api.dto.ReservationRequest;
 import com.julia_auto_cars.rental_api.dto.ReservationResponse;
@@ -9,21 +14,29 @@ import com.julia_auto_cars.rental_api.repository.CustomerRepository;
 import com.julia_auto_cars.rental_api.repository.ReservationRepository;
 import com.julia_auto_cars.rental_api.service.ReservationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional
 public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final CustomerRepository customerRepository;
     private final CarRepository carRepository;
+    private final AutomationEngine automationEngine;
+    private final AutomationEventRepository automationEventRepository;
+    private final AutomationJobRepository automationJobRepository;
 
     // This method is used to create a new reservation. It validates the input data, checks for availability, saves the customer if necessary, creates the reservation, attaches any extras, computes the totals, and saves the reservation to the repository. Finally, it maps the saved reservation to a response DTO and returns it.
     @Override
@@ -58,6 +71,24 @@ public class ReservationServiceImpl implements ReservationService {
         computeTotals(reservation);
 
         Reservation saved = reservationRepository.save(reservation);
+
+        // Emit a BOOKING_STARTED event so the abandoned flow can be scheduled.
+        try {
+            var payload = new HashMap<String, Object>();
+            payload.put("reservationId", saved.getId());
+            payload.put("carId", saved.getCarId());
+            payload.put("customerId", saved.getCustomer() != null ? saved.getCustomer().getId() : null);
+            payload.put("status", saved.getStatus().name());
+            automationEngine.dispatch(
+                    AutomationEventType.BOOKING_STARTED,
+                    String.valueOf(saved.getId()),
+                    "service",
+                    payload
+            );
+        } catch (Exception e) {
+            log.warn("automation_dispatch_failed_on_create reservationId={} err={}", saved.getId(), e.getMessage());
+        }
+
         return mapToResponse(saved);
     }
 
@@ -103,7 +134,28 @@ public class ReservationServiceImpl implements ReservationService {
             return mapToResponse(reservation);
         }
         reservation.setStatus(ReservationStatus.CONFIRMED);
-        return mapToResponse(reservation);
+        Reservation saved = reservationRepository.save(reservation);
+
+        // Cancel any pending abandon jobs since the reservation is now confirmed.
+        cancelAbandonJobs(saved.getId());
+
+        // Trigger both the booking_confirmation flow and the upsell flow.
+        try {
+            var payload = new HashMap<String, Object>();
+            payload.put("reservationId", saved.getId());
+            payload.put("carId", saved.getCarId());
+            payload.put("customerId", saved.getCustomer() != null ? saved.getCustomer().getId() : null);
+            payload.put("status", saved.getStatus().name());
+            automationEngine.dispatch(
+                    AutomationEventType.BOOKING_CONFIRMED,
+                    String.valueOf(saved.getId()),
+                    "service",
+                    payload
+            );
+        } catch (Exception e) {
+            log.warn("automation_dispatch_failed_on_confirm reservationId={} err={}", saved.getId(), e.getMessage());
+        }
+        return mapToResponse(saved);
     }
 
     // This method is used to cancel a reservation. It retrieves the reservation by its ID, updates its status to CANCELLED, and adds any cancellation reason as notes. Finally, it maps the updated reservation to a response DTO and returns it.
@@ -114,6 +166,33 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setNotes(reason);
         return mapToResponse(reservation);
+    }
+
+    /**
+     * Mark a reservation as completed (after the rental period). Triggers the
+     * review-request flow 24h later via the RENTAL_COMPLETED event.
+     */
+    public ReservationResponse completeReservation(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Reservation introuvable"));
+        reservation.setStatus(ReservationStatus.COMPLETED);
+        Reservation saved = reservationRepository.save(reservation);
+        try {
+            automationEngine.dispatch(
+                    AutomationEventType.RENTAL_COMPLETED,
+                    String.valueOf(saved.getId()),
+                    "service",
+                    Map.of(
+                            "reservationId", saved.getId(),
+                            "carId", saved.getCarId(),
+                            "customerId", saved.getCustomer() != null ? saved.getCustomer().getId() : null,
+                            "status", saved.getStatus().name()
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("automation_dispatch_failed_on_complete reservationId={} err={}", saved.getId(), e.getMessage());
+        }
+        return mapToResponse(saved);
     }
 
   // delete reservation
@@ -225,6 +304,22 @@ public class ReservationServiceImpl implements ReservationService {
 
     private int daysBetween(java.time.LocalDate start, java.time.LocalDate end) {
         return (int) ChronoUnit.DAYS.between(start, end);
+    }
+
+    private void cancelAbandonJobs(Long reservationId) {
+        automationEventRepository.findByExternalIdAndType(
+                String.valueOf(reservationId), AutomationEventType.BOOKING_STARTED)
+            .ifPresent(event -> {
+                automationJobRepository.findFirstByEventIdAndFlow(event.getId(), "booking_abandoned")
+                    .ifPresent(job -> {
+                        if (job.getStatus() == JobStatus.SCHEDULED || job.getStatus() == JobStatus.RUNNING) {
+                            job.setStatus(JobStatus.CANCELLED);
+                            job.setFinishedAt(OffsetDateTime.now());
+                            automationJobRepository.save(job);
+                            log.info("cancelled_abandon_job reservationId={} jobId={}", reservationId, job.getId());
+                        }
+                    });
+            });
     }
 
     private ReservationResponse mapToResponse(Reservation reservation) {

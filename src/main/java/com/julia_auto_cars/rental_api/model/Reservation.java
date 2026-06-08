@@ -60,6 +60,13 @@ public class Reservation {
     @Column(length = 500)
     private String notes;
 
+    // ── automation flags (managed exclusively by the automation module) ──────
+    @Column(name = "abandoned_sent",    nullable = false, columnDefinition = "boolean default false") @Builder.Default private Boolean abandonedSent    = Boolean.FALSE;
+    @Column(name = "confirmation_sent", nullable = false, columnDefinition = "boolean default false") @Builder.Default private Boolean confirmationSent = Boolean.FALSE;
+    @Column(name = "reminder_sent",     nullable = false, columnDefinition = "boolean default false") @Builder.Default private Boolean reminderSent     = Boolean.FALSE;
+    @Column(name = "review_sent",       nullable = false, columnDefinition = "boolean default false") @Builder.Default private Boolean reviewSent       = Boolean.FALSE;
+    @Column(name = "upsell_sent",       nullable = false, columnDefinition = "boolean default false") @Builder.Default private Boolean upsellSent       = Boolean.FALSE;
+
     @Column(nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

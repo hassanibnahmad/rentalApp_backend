@@ -3,11 +3,13 @@ package com.julia_auto_cars.rental_api.repository;
 
 import com.julia_auto_cars.rental_api.model.Reservation;
 import com.julia_auto_cars.rental_api.model.ReservationStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 // Repository for Reservation entity that extends JpaRepository to provide CRUD operations and custom query to find overlapping reservations based on car ID, date range, and reservation statuses.
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
@@ -31,5 +33,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
                                                  @Param("startDate") LocalDate startDate,
                                                  @Param("endDate") LocalDate endDate,
                                                  @Param("statuses") List<ReservationStatus> statuses);
+
+    /** Used by the rental-reminder cron to find upcoming pickups. */
+    List<Reservation> findByStatusAndPickupDateBetween(ReservationStatus status,
+                                                       LocalDate from,
+                                                       LocalDate to);
+
+    /** Used by the polling fallback. */
+    List<Reservation> findByUpdatedAtGreaterThanOrderByUpdatedAtAsc(OffsetDateTime cursor, Pageable pageable);
+
+    default List<Reservation> findConfirmedPickupBetween(ReservationStatus status, LocalDate from, LocalDate to) {
+        return findByStatusAndPickupDateBetween(status, from, to);
+    }
+
+    default List<Reservation> findUpdatedAfter(OffsetDateTime cursor, Pageable pageable) {
+        return findByUpdatedAtGreaterThanOrderByUpdatedAtAsc(cursor, pageable);
+    }
 }
 

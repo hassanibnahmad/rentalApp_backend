@@ -5,3 +5,21 @@ services:
     dockerfilePath: Dockerfile
     branch: main
     plan: free
+
+  # Self-hosted WhatsApp gateway (no Meta account required).
+  # Note: needs an "always-on" plan because the WhatsApp session dies if the
+  # container sleeps. Use "starter" ($7/mo) on Render, or deploy to fly.io
+  # (free, always-on) — see wppconnect-server/README.md.
+  - type: web
+    name: julia-wppconnect
+    runtime: image
+    image: ibsddev/wppconnect-server:latest
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: SECRET_KEY
+        value: julia-rental-secret-2026
+      - key: PORT
+        value: "21465"
+      - key: START_ALL_SESSIONS
+        value: "false"

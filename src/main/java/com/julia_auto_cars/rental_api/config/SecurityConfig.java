@@ -34,6 +34,11 @@ public class    SecurityConfig {
                     .requestMatchers("/api/auth/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/reservations").permitAll()
                     .requestMatchers("/api/cars/**", "/api/availability").permitAll()
+                    // Automation webhook receiver (Meta verification + callbacks).
+                    .requestMatchers("/api/automation/webhooks/**").permitAll()
+                    // External event ingestion is public for now; gate with HMAC in production.
+                    .requestMatchers(HttpMethod.POST, "/api/automation/events", "/api/automation/events/**").permitAll()
+                    .requestMatchers("/api/automation/**").hasAuthority("ADMIN")
                     .requestMatchers("/api/reservations/**").hasAnyAuthority("ADMIN", "CLIENT")
                     .anyRequest().authenticated()
                 )
